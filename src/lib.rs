@@ -15,7 +15,8 @@ use frame_support::{
 };
 use frame_system::{
 	self as system, 
-	ensure_signed
+	ensure_signed,
+	ensure_root
 };
 use parity_scale_codec::{
 	Decode, 
@@ -262,7 +263,7 @@ decl_module! {
 		
 		#[weight = 10_000]
 		fn accounts(origin, account_type:u32, account_id:AccountIdOf<T>) {
-			let _creator = ensure_signed(origin)?;
+			let _creator = ensure_root(origin)?;
 			if account_type == 1 {
 				<AccountOperation<T>>::put(account_id)
 			} else if account_type == 2 {
@@ -272,7 +273,7 @@ decl_module! {
 
 		#[weight = 10_000]
 		fn fees(origin, fee_type:u32, fee:BalanceOf<T>) {
-			let _creator = ensure_signed(origin)?;
+			let _creator = ensure_root(origin)?;
 			if fee_type == 1 {
 				<MinimumVolume<T>>::put(fee)
 			} else if fee_type == 2 {
@@ -288,7 +289,7 @@ decl_module! {
 			target: u32
 			) {
 
-			let promoter = ensure_signed(origin)?;
+			let promoter = ensure_root(origin)?;
 			let created = <system::Module<T>>::block_number();
 			let active: bool = true;
 
@@ -487,7 +488,7 @@ decl_module! {
 			initial_supply: BalanceOf<T>
 		) -> DispatchResult {
 
-			let caller = ensure_signed(origin)?;
+			let caller = ensure_root(origin)?;
 
 			let index = TokenCount::get();
 			TokenCount::put(index + 1);		
