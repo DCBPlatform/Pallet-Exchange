@@ -10,7 +10,7 @@ use frame_support::{
 	traits::{
 		Currency, 
 		ReservableCurrency, 
-		ExistenceRequirement::AllowDeath, Imbalance, OnUnbalanced
+		ExistenceRequirement::AllowDeath
 	},
 };
 use frame_system::{
@@ -23,8 +23,6 @@ use parity_scale_codec::{
 	Encode
 };
 use sp_std::prelude::*;
-//use sp_runtime::{ModuleId, traits::AccountIdConversion};
-//use pallet_token::{self as Token};
 
 
 #[cfg(test)]
@@ -33,8 +31,6 @@ mod tests;
 pub trait Trait: system::Trait {
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 	type Currency: ReservableCurrency<Self::AccountId>;
-	// type AccountOperation: AccountIdOf<T>;
-	// type AccountVault: AccountIdOf<T>;
 }
 
 
@@ -67,7 +63,7 @@ type SellOrderNativeInfoOf<T> = SellOrderNativeInfo<AccountIdOf<T>, BalanceOf<T>
 pub struct PairInfo<AccountId, BlockNumber> {
 	base: u32,
 	target: u32,
-	promoter: AccountId,
+	banker: AccountId,
 	active: bool,
 	created: BlockNumber
 }
@@ -76,7 +72,7 @@ pub struct PairInfo<AccountId, BlockNumber> {
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct PairNativeInfo<AccountId, BlockNumber> {
 	target: u32,
-	promoter: AccountId,
+	banker: AccountId,
 	active: bool,
 	created: BlockNumber
 }
@@ -194,14 +190,14 @@ decl_storage! {
 		pub TokenSupply get(fn token_supply): map hasher(blake2_128_concat) u32 => BalanceOf<T>;
 		pub TokenPaused get(fn token_paused): map hasher(blake2_128_concat) u32 => bool;
 		pub TokenApproval get(fn token_approval): map hasher(blake2_128_concat) (u32, T::AccountId, T::AccountId) => BalanceOf<T>;
-		pub TokenOwner get(fn token_owner): map hasher(blake2_128_concat) u32 => T::AccountId;		
+		pub TokenOwner get(fn token_owner): map hasher(blake2_128_concat) u32 => T::AccountId;	
 	}
 }
 
 decl_event! {
 	pub enum Event<T> where
 		Balance = BalanceOf<T>,
-		<T as system::Trait>::AccountId,
+		AccountId = <T as system::Trait>::AccountId,
 		<T as system::Trait>::BlockNumber,
 	{
 		/// Pair successfully created. \[pair_id, block_number\]
@@ -222,7 +218,8 @@ decl_event! {
 		TradeCreated(TradeIndex, PairIndex, Balance, Balance),
 		/// Trade successfully created. \[trade_id, pair_id, ratio, volume\]
 		TradeNativeCreated(TradeIndex, PairIndex, Balance, Balance),		
-
+		/// Token was created by user. \[token_id, owner_id\]
+		NewTokenCreated(u32),
 		/// Token was created by user. \[token_id, owner_id\]
 		TokenCreated(u32, AccountId),
 		/// Token burned. \[token, sender, amount\]
@@ -288,21 +285,23 @@ decl_module! {
 			base: u32,
 			target: u32
 			) {
-
-			let promoter = ensure_root(origin)?;
+			ensure_root(origin.clone())?;
+			let banker = ensure_signed(origin)?;
 			let created = <system::Module<T>>::block_number();
 			let active: bool = true;
 
 			let index = PairCount::get();
 			PairCount::put(index + 1);
 
-			<Pair<T>>::insert(index, PairInfo {
-				base,
-				target,
-				promoter,
-				active,
-				created
-			});
+			let thing: PairInfoOf<T> = PairInfo {
+				base :base,
+				target :target,
+				banker,			
+				active :active,
+				created :created
+			};
+
+			<Pair<T>>::insert(index, thing);
 
 			Self::deposit_event(RawEvent::PairCreated(index, created));
 		}	
@@ -312,8 +311,8 @@ decl_module! {
 			origin,
 			target: u32
 			) {
-
-			let promoter = ensure_signed(origin)?;
+			ensure_root(origin.clone())?;
+			let banker = ensure_signed(origin)?;
 			let created = <system::Module<T>>::block_number();
 			let active: bool = true;
 
@@ -322,7 +321,7 @@ decl_module! {
 
 			<PairNative<T>>::insert(index, PairNativeInfo {
 				target,
-				promoter,
+				banker,
 				active,
 				created
 			});
@@ -487,8 +486,8 @@ decl_module! {
 			symbol: Vec<u8>, 
 			initial_supply: BalanceOf<T>
 		) -> DispatchResult {
-
-			let caller = ensure_root(origin)?;
+			ensure_root(origin.clone())?;
+			let caller = ensure_signed(origin)?;
 
 			let index = TokenCount::get();
 			TokenCount::put(index + 1);		
@@ -506,7 +505,7 @@ decl_module! {
 			<TokenSupply<T>>::insert(index, initial_supply);
 			<TokenOwner<T>>::insert(index, &caller);
 
-			Self::deposit_event(RawEvent::TokenCreated(index, caller));
+			Self::deposit_event(RawEvent::NewTokenCreated(index));
 
 			Ok(())
 		}	
@@ -600,8 +599,7 @@ impl<T: Trait> Module<T> {
 		to: AccountIdOf<T>, 
 		value:BalanceOf<T>) -> () {
 
-		T::Currency::transfer(&from, &to, value, AllowDeath);//.map_err(|_| DispatchError::Other("Can't make transfer"))?;
-	
+		let _lol = T::Currency::transfer(&from, &to, value, AllowDeath);//.map_err(|_| DispatchError::Other("Can't make transfer"))?;			
 	}	
 
 	fn transfer_token(token: u32, 
