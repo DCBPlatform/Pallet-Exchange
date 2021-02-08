@@ -9,6 +9,7 @@ use frame_support::{
 	dispatch::DispatchResult,
 	traits::{
 		Currency, 
+		Get,
 		ReservableCurrency, 
 		ExistenceRequirement::AllowDeath
 	},
@@ -24,6 +25,8 @@ use parity_scale_codec::{
 };
 use sp_std::prelude::*;
 
+use pallet_token;
+
 
 #[cfg(test)]
 mod tests;
@@ -31,7 +34,12 @@ mod tests;
 pub trait Trait: system::Trait {
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 	type Currency: ReservableCurrency<Self::AccountId>;
+
+	// type AccountOperation: Get<Self::AccountId>;
+	// type AccountVault: Get<Self::AccountId>;
+
 }
+
 
 
 pub type PairIndex = u128;
@@ -217,25 +225,23 @@ decl_event! {
 		/// Trade successfully created. \[trade_id, pair_id, ratio, volume\]
 		TradeCreated(TradeIndex, PairIndex, Balance, Balance),
 		/// Trade successfully created. \[trade_id, pair_id, ratio, volume\]
-		TradeNativeCreated(TradeIndex, PairIndex, Balance, Balance),		
-		/// Token was created by user. \[token_id, owner_id\]
-		NewTokenCreated(u32),
-		/// Token was created by user. \[token_id, owner_id\]
-		TokenCreated(u32, AccountId),
-		/// Token burned. \[token, sender, amount\]
+		TradeNativeCreated(TradeIndex, PairIndex, Balance, Balance),	
+		
+		
+		/// Token was created by user. \[Token ID\]
+		TokenCreated(u32),
+		/// Token burned. \[Token ID, Sender, Amount\]
 		TokenBurn(u32, AccountId, Balance),
-		/// Token minted. \[token, receiver, amount\]
+		/// Token minted. \[Token ID, Receiver, Amount\]
 		TokenMint(u32, AccountId, Balance),
-		/// Token transferred. \[token, sender, receiver, amount\]
+		/// Token transferred. \[Token ID, Sender, Receiver, Amount\]
 		TokenTransfer(u32, AccountId, AccountId, Balance),
-		/// Token transferred. \[token, sender, spender, amount\]
+		/// Token transferred. \[Token ID, Sender, Spender, Amount\]
 		TokenTransferFrom(u32, AccountId, AccountId, Balance),		
-		/// Token approved. \[token, spender, user, amount\]
+		/// Token approved. \[Token ID, Spender, User, Amount\]
 		TokenApproval(u32, AccountId, AccountId, Balance),
-		/// Token paused/unpaused. \[token, status\]
+		/// Token paused/unpaused. \[Token ID, Status\]
 		TokenPausedOperation(u32, bool),		
-
-		TestSend(u32, BlockNumber),
 	}
 }
 
@@ -259,7 +265,7 @@ decl_module! {
 		type Error = Error<T>;		
 		
 		#[weight = 10_000]
-		fn accounts(origin, account_type:u32, account_id:AccountIdOf<T>) {
+		fn exchange_accounts(origin, account_type:u32, account_id:AccountIdOf<T>) {
 			let _creator = ensure_root(origin)?;
 			if account_type == 1 {
 				<AccountOperation<T>>::put(account_id)
@@ -269,7 +275,7 @@ decl_module! {
 		}
 
 		#[weight = 10_000]
-		fn fees(origin, fee_type:u32, fee:BalanceOf<T>) {
+		fn exchange_fees(origin, fee_type:u32, fee:BalanceOf<T>) {
 			let _creator = ensure_root(origin)?;
 			if fee_type == 1 {
 				<MinimumVolume<T>>::put(fee)
@@ -280,7 +286,7 @@ decl_module! {
 		}		
 
 		#[weight = 10_000]
-		fn pair_create(
+		fn exchange_pair_create(
 			origin,
 			base: u32,
 			target: u32
@@ -307,7 +313,7 @@ decl_module! {
 		}	
 
 		#[weight = 10_000]
-		fn pair_native_create(
+		fn exchange_pair_native_create(
 			origin,
 			target: u32
 			) {
@@ -330,7 +336,7 @@ decl_module! {
 		}		
 	
 		#[weight = 10_000]
-		fn order_create_buy(
+		fn exchange_order_create_buy(
 			origin,
 			pair: PairIndex,
 			volume: BalanceOf<T>,
@@ -368,7 +374,7 @@ decl_module! {
 		}	
 
 		#[weight = 10_000]
-		fn order_native_create_buy(
+		fn exchange_order_native_create_buy(
 			origin,
 			pair: PairIndex,
 			volume: BalanceOf<T>,
@@ -406,7 +412,7 @@ decl_module! {
 		}			
 	
 		#[weight = 10_000]
-		fn order_create_sell(
+		fn exchange_order_create_sell(
 			origin,
 			pair: PairIndex,
 			volume: BalanceOf<T>,
@@ -443,7 +449,7 @@ decl_module! {
 		}	
 		
 		#[weight = 10_000]
-		fn order_native_create_sell(
+		fn exchange_order_native_create_sell(
 			origin,
 			pair: PairIndex,
 			volume: BalanceOf<T>,
@@ -505,7 +511,7 @@ decl_module! {
 			<TokenSupply<T>>::insert(index, initial_supply);
 			<TokenOwner<T>>::insert(index, &caller);
 
-			Self::deposit_event(RawEvent::NewTokenCreated(index));
+			Self::deposit_event(RawEvent::TokenCreated(index));
 
 			Ok(())
 		}	
@@ -569,9 +575,10 @@ decl_module! {
 		) -> DispatchResult {
 			let caller = ensure_signed(origin)?;
 			let token_owner = Self::token_owner(token);
-			ensure!(caller == token_owner, <Error<T>>::NotTokenOwner);			
+			ensure!(caller == token_owner, <Error<T>>::NotTokenOwner);		
 
 			let burner_balance = Self::token_balance((token, &caller));
+			ensure!(value < burner_balance, <Error<T>>::InsufficientAmount);			
 			let token_supply = Self::token_supply(token);
 
 			<TokenBalance<T>>::insert((token, &caller), burner_balance - value);
@@ -607,6 +614,7 @@ impl<T: Trait> Module<T> {
 		to: AccountIdOf<T>, 
 		value:BalanceOf<T>) -> () {
 
+		//let sender_balance2 = <pallet_token::TokenBalance<T>>::token_balance((token.clone(), from.clone()));//<pallet_token::TokenBalance<T>>::get((token.clone(), from.clone()));
 		let sender_balance = Self::token_balance((token, &from));
 		let receiver_balance = Self::token_balance((token, &to));
 

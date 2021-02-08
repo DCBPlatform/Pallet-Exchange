@@ -20,6 +20,7 @@ sp-core = { version = '2.0.0', default-features = false }
 sp-runtime = { version = '2.0.0', default-features = false }
 sp-std = { version = '2.0.0', default-features = false }
 sp-storage = { version = '2.0.0', default-features = false }
+pallet-token = { path = '../token', default-features = false, version = '2.0.0' }
 
 [dev-dependencies]
 sp-core = { version = '2.0.0', default-features = false }
@@ -36,4 +37,5 @@ std = [
 	'sp-runtime/std',
 	'sp-std/std',
 	'sp-storage/std',
+	'pallet-token/std',
 ]
