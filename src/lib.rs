@@ -9,7 +9,7 @@ use frame_support::{
 	dispatch::DispatchResult,
 	traits::{
 		Currency, 
-		Get,
+		//Get,
 		ReservableCurrency, 
 		ExistenceRequirement::AllowDeath
 	},
@@ -17,7 +17,7 @@ use frame_support::{
 use frame_system::{
 	self as system, 
 	ensure_signed,
-	ensure_root
+	//ensure_root
 };
 use parity_scale_codec::{
 	Decode, 
@@ -25,16 +25,15 @@ use parity_scale_codec::{
 };
 use sp_std::prelude::*;
 
-use pallet_token;
+use pallet_token as Token;
 
 
 #[cfg(test)]
 mod tests;
 
-pub trait Trait: system::Trait {
+pub trait Trait: system::Trait + pallet_token::Trait   {
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 	type Currency: ReservableCurrency<Self::AccountId>;
-
 	// type AccountOperation: Get<Self::AccountId>;
 	// type AccountVault: Get<Self::AccountId>;
 
@@ -53,13 +52,12 @@ pub type SellOrderNativeIndex = u128;
 pub type TokenIndex = u32;
 
 type AccountIdOf<T> = <T as system::Trait>::AccountId;
-type BalanceOf<T> = <<T as Trait>::Currency as Currency<AccountIdOf<T>>>::Balance;
+type BalanceOf<T> = <<T as pallet_token::Trait>::Currency as Currency<AccountIdOf<T>>>::Balance;
 
 type PairInfoOf<T> = PairInfo<AccountIdOf<T>, <T as system::Trait>::BlockNumber>;
 type PairNativeInfoOf<T> = PairNativeInfo<AccountIdOf<T>, <T as system::Trait>::BlockNumber>;
 type TradeInfoOf<T> = TradeInfo<AccountIdOf<T>, BalanceOf<T>, <T as system::Trait>::BlockNumber>;
 type TradeNativeInfoOf<T> = TradeNativeInfo<AccountIdOf<T>, BalanceOf<T>, <T as system::Trait>::BlockNumber>;
-type TokenInfoOf<T> = TokenInfo<AccountIdOf<T>, <T as system::Trait>::BlockNumber>;
 type BuyOrderInfoOf<T> = BuyOrderInfo<AccountIdOf<T>, BalanceOf<T>, <T as system::Trait>::BlockNumber>;
 type BuyOrderNativeInfoOf<T> = BuyOrderNativeInfo<AccountIdOf<T>, BalanceOf<T>, <T as system::Trait>::BlockNumber>;
 type SellOrderInfoOf<T> = SellOrderInfo<AccountIdOf<T>, BalanceOf<T>, <T as system::Trait>::BlockNumber>;
@@ -153,17 +151,6 @@ pub struct TradeNativeInfo<AccountId, Balance,  BlockNumber> {
 	created: BlockNumber
 }
 
-
-#[derive(Encode, Decode, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct TokenInfo<AccountId, BlockNumber> {
-	name: Vec<u8>,
-	symbol: Vec<u8>,	
-	owner: AccountId,
-	created: BlockNumber,
-}
-
-
 decl_storage! {
 	trait Store for Module<T: Trait> as Exchange {
 
@@ -173,39 +160,38 @@ decl_storage! {
 
 		pub Pair get(fn pair): map hasher(blake2_128_concat) PairIndex => Option<PairInfoOf<T>>;
 		pub PairCount get(fn pair_count): PairIndex;	
+
 		pub PairNative get(fn pair_native): map hasher(blake2_128_concat) PairIndex => Option<PairNativeInfoOf<T>>;
 		pub PairNativeCount get(fn pair_native_count): PairIndex;			
 
-		pub BuyOrder get(fn buy_order): map  hasher(blake2_128_concat) u128 => Option<BuyOrderInfoOf<T>>;
-		pub BuyOrderCount get(fn buy_order_count): map hasher(blake2_128_concat) u128 => u128;
-		pub BuyOrderNative get(fn buy_order_native): map  hasher(blake2_128_concat) u128 => Option<BuyOrderNativeInfoOf<T>>;
-		pub BuyOrderNativeCount get(fn buy_order_native_count): map hasher(blake2_128_concat) u128 => u128;
+		pub BuyOrder get(fn buy_order): map  hasher(blake2_128_concat) (PairIndex, BuyOrderIndex) => BuyOrderInfoOf<T>;
+		pub BuyOrderList get(fn buy_order_list): map  hasher(blake2_128_concat) PairIndex => Vec<BuyOrderIndex>;
+		pub BuyOrderCount get(fn buy_order_count): map hasher(blake2_128_concat) PairIndex => BuyOrderIndex;
 
-		pub SellOrder get(fn sell_order): map  hasher(blake2_128_concat) u128 => Option<SellOrderInfoOf<T>>;
-		pub SellOrderCount get(fn sell_order_count): map hasher(blake2_128_concat) u128 => u128;
-		pub SellOrderNative get(fn sell_order_native): map  hasher(blake2_128_concat) u128 => Option<SellOrderNativeInfoOf<T>>;
-		pub SellOrderNativeCount get(fn sell_order_native_count): map hasher(blake2_128_concat) u128 => u128;
+		pub BuyOrderNative get(fn buy_order_native): map  hasher(blake2_128_concat) (PairNativeIndex, BuyOrderNativeIndex) => BuyOrderNativeInfoOf<T>;
+		pub BuyOrderNativeList get(fn buy_order_native_list): map  hasher(blake2_128_concat) PairNativeIndex => Vec<BuyOrderNativeIndex>;
+		pub BuyOrderNativeCount get(fn buy_order_native_count): map hasher(blake2_128_concat) PairNativeIndex => BuyOrderNativeIndex;
 
-		pub Trades get(fn trades): map hasher(blake2_128_concat) u128 => Option<TradeInfoOf<T>>;
-		pub TradeCount get(fn trade_count): map hasher(blake2_128_concat) u128 => u128;
-		pub TradeNatives get(fn trade_natives): map hasher(blake2_128_concat) u128 => Option<TradeNativeInfoOf<T>>;
-		pub TradeNativeCount get(fn trade_native_count): map hasher(blake2_128_concat) u128 => u128;		
+		pub SellOrder get(fn sell_order): map  hasher(blake2_128_concat) (PairIndex, SellOrderIndex) => SellOrderInfoOf<T>;
+		pub SellOrderList get(fn sell_order_list): map  hasher(blake2_128_concat) PairIndex => Vec<SellOrderIndex>;
+		pub SellOrderCount get(fn sell_order_count): map hasher(blake2_128_concat) PairIndex => SellOrderIndex;
 
-		pub Tokens get(fn tokens): map hasher(blake2_128_concat) TokenIndex => Option<TokenInfoOf<T>>;
-		pub TokenCount get(fn token_count): TokenIndex;
+		pub SellOrderNative get(fn sell_order_native): map  hasher(blake2_128_concat) (PairNativeIndex, SellOrderNativeIndex) => SellOrderNativeInfoOf<T>;
+		pub SellOrderNativeList get(fn sell_order_native_list): map  hasher(blake2_128_concat) PairNativeIndex => Vec<SellOrderNativeIndex>;
+		pub SellOrderNativeCount get(fn sell_order_native_count): map hasher(blake2_128_concat) PairNativeIndex => SellOrderNativeIndex;
 
-		pub TokenBalance get(fn token_balance): map hasher(blake2_128_concat) (u32, T::AccountId) => BalanceOf<T>;
-		pub TokenSupply get(fn token_supply): map hasher(blake2_128_concat) u32 => BalanceOf<T>;
-		pub TokenPaused get(fn token_paused): map hasher(blake2_128_concat) u32 => bool;
-		pub TokenApproval get(fn token_approval): map hasher(blake2_128_concat) (u32, T::AccountId, T::AccountId) => BalanceOf<T>;
-		pub TokenOwner get(fn token_owner): map hasher(blake2_128_concat) u32 => T::AccountId;	
+		pub Trades get(fn trades): map hasher(blake2_128_concat) (PairIndex, TradeIndex) => Option<TradeInfoOf<T>>;
+		pub TradeCount get(fn trade_count): map hasher(blake2_128_concat) PairIndex => TradeIndex;
+		
+		pub TradeNatives get(fn trade_natives): map hasher(blake2_128_concat) (PairNativeIndex, TradeNativeIndex) => Option<TradeNativeInfoOf<T>>;
+		pub TradeNativeCount get(fn trade_native_count): map hasher(blake2_128_concat) PairNativeIndex => TradeNativeIndex;		
 	}
 }
 
 decl_event! {
 	pub enum Event<T> where
 		Balance = BalanceOf<T>,
-		AccountId = <T as system::Trait>::AccountId,
+		//AccountId = <T as system::Trait>::AccountId,
 		<T as system::Trait>::BlockNumber,
 	{
 		/// Pair successfully created. \[pair_id, block_number\]
@@ -226,22 +212,7 @@ decl_event! {
 		TradeCreated(TradeIndex, PairIndex, Balance, Balance),
 		/// Trade successfully created. \[trade_id, pair_id, ratio, volume\]
 		TradeNativeCreated(TradeIndex, PairIndex, Balance, Balance),	
-		
-		
-		/// Token was created by user. \[Token ID\]
-		TokenCreated(u32),
-		/// Token burned. \[Token ID, Sender, Amount\]
-		TokenBurn(u32, AccountId, Balance),
-		/// Token minted. \[Token ID, Receiver, Amount\]
-		TokenMint(u32, AccountId, Balance),
-		/// Token transferred. \[Token ID, Sender, Receiver, Amount\]
-		TokenTransfer(u32, AccountId, AccountId, Balance),
-		/// Token transferred. \[Token ID, Sender, Spender, Amount\]
-		TokenTransferFrom(u32, AccountId, AccountId, Balance),		
-		/// Token approved. \[Token ID, Spender, User, Amount\]
-		TokenApproval(u32, AccountId, AccountId, Balance),
-		/// Token paused/unpaused. \[Token ID, Status\]
-		TokenPausedOperation(u32, bool),		
+				
 	}
 }
 
@@ -266,7 +237,7 @@ decl_module! {
 		
 		#[weight = 10_000]
 		fn exchange_accounts(origin, account_type:u32, account_id:AccountIdOf<T>) {
-			let _creator = ensure_root(origin)?;
+			let _creator = ensure_signed(origin)?;
 			if account_type == 1 {
 				<AccountOperation<T>>::put(account_id)
 			} else if account_type == 2 {
@@ -276,7 +247,7 @@ decl_module! {
 
 		#[weight = 10_000]
 		fn exchange_fees(origin, fee_type:u32, fee:BalanceOf<T>) {
-			let _creator = ensure_root(origin)?;
+			let _creator = ensure_signed(origin)?;
 			if fee_type == 1 {
 				<MinimumVolume<T>>::put(fee)
 			} else if fee_type == 2 {
@@ -291,7 +262,7 @@ decl_module! {
 			base: u32,
 			target: u32
 			) {
-			ensure_root(origin.clone())?;
+			
 			let banker = ensure_signed(origin)?;
 			let created = <system::Module<T>>::block_number();
 			let active: bool = true;
@@ -317,7 +288,7 @@ decl_module! {
 			origin,
 			target: u32
 			) {
-			ensure_root(origin.clone())?;
+			
 			let banker = ensure_signed(origin)?;
 			let created = <system::Module<T>>::block_number();
 			let active: bool = true;
@@ -350,17 +321,17 @@ decl_module! {
 
 			let exchange = Self::account_operation();
 
-			let base_balance = Self::token_balance((base, &caller));				
+			let base_balance = <Token::Module<T>>::balance((base, &caller));				
 			ensure!(base_balance >= volume, Error::<T>::InsufficientAmount);
 
 			let _volume = volume;
 			let _ratio = ratio;	
 
-			Self::transfer_token(base, caller.clone(), exchange.clone(), _volume.clone());					
+			<Token::Module<T>>::transfer_(base, caller.clone(), exchange.clone(), _volume.clone());					
 
 			let index = <BuyOrderCount>::get(pair);			
 
-			<BuyOrder<T>>::insert(index, BuyOrderInfo {
+			<BuyOrder<T>>::insert((pair, index), BuyOrderInfo {
 				order_id: index,
 				pair,
 				buyer: caller,
@@ -368,7 +339,9 @@ decl_module! {
 				ratio: _ratio,
 				created
 			});
-
+			let mut buy_order_list = <BuyOrderList>::get(pair);
+			buy_order_list.insert(buy_order_list.len(), index);
+			<BuyOrderList>::insert(pair, buy_order_list);
 			<BuyOrderCount>::insert(pair, index + 1);
 			//Self::deposit_event(RawEvent::BuyOrderCreated(index, pair, _ratio, _volume));
 		}	
@@ -388,8 +361,6 @@ decl_module! {
 
 			let exchange = Self::account_operation();
 			
-			//let balance = Self::token_balance((base, &caller));				
-			//ensure!(balance >= volume, Error::<T>::InsufficientAmount);
 
 			let _volume = volume;
 			let _ratio = ratio;	
@@ -398,7 +369,7 @@ decl_module! {
 
 			let index = <BuyOrderNativeCount>::get(pair);			
 
-			<BuyOrderNative<T>>::insert(index, BuyOrderNativeInfo {
+			<BuyOrderNative<T>>::insert((pair, index), BuyOrderNativeInfo {
 				order_id: index,
 				pair,
 				buyer: caller,
@@ -407,6 +378,9 @@ decl_module! {
 				created
 			});
 
+			let mut buy_order_list = <BuyOrderNativeList>::get(pair);
+			buy_order_list.insert(buy_order_list.len(), index);			
+			<BuyOrderNativeList>::insert(pair, buy_order_list);
 			<BuyOrderNativeCount>::insert(pair, index + 1);
 			//Self::deposit_event(RawEvent::BuyOrderNativeCreated(index, pair, _ratio, _volume));
 		}			
@@ -425,17 +399,17 @@ decl_module! {
 			let volume = volume;
 			let ratio = ratio;					
 			let exchange = Self::account_operation();
-			let target_balance = Self::token_balance((target, &caller));			
+			let target_balance = <Token::Module<T>>::balance((target, &caller));			
 
 			ensure!(target_balance >= volume, Error::<T>::InsufficientAmount);
 
 			let _volume = volume;
 			let _ratio = ratio;	
 			
-			Self::transfer_token(target, caller.clone(), exchange.clone(), _volume);		
+			<Token::Module<T>>::transfer_(target, caller.clone(), exchange.clone(), _volume);		
 
 			let index = <SellOrderCount>::get(pair);		
-			<SellOrder<T>>::insert(index, SellOrderInfo {
+			<SellOrder<T>>::insert((pair, index), SellOrderInfo {
 				order_id: index,
 				pair,
 				seller: caller,
@@ -443,7 +417,9 @@ decl_module! {
 				ratio: _ratio,
 				created
 			});
-
+			let mut sell_order_list = <SellOrderList>::get(pair);
+			sell_order_list.insert(sell_order_list.len(), index);			
+			<SellOrderList>::insert(pair, sell_order_list);
 			<SellOrderCount>::insert(pair, index + 1);	
 			//Self::deposit_event(RawEvent::SellOrderCreated(index, pair, _ratio, _volume));
 		}	
@@ -462,17 +438,17 @@ decl_module! {
 			let volume = volume;
 			let ratio = ratio;					
 			let exchange = Self::account_operation();
-			let target_balance = Self::token_balance((target, &caller));			
+			let target_balance = <Token::Module<T>>::balance((target, &caller));			
 
 			ensure!(target_balance >= volume, Error::<T>::InsufficientAmount);
 
 			let _volume = volume;
 			let _ratio = ratio;	
 			
-			Self::transfer_token(target, caller.clone(), exchange.clone(), _volume);		
+			<Token::Module<T>>::transfer_(target, caller.clone(), exchange.clone(), _volume);		
 
 			let index = <SellOrderNativeCount>::get(pair);		
-			<SellOrderNative<T>>::insert(index, SellOrderNativeInfo {
+			<SellOrderNative<T>>::insert((pair, index), SellOrderNativeInfo {
 				order_id: index,
 				pair,
 				seller: caller,
@@ -480,113 +456,13 @@ decl_module! {
 				ratio: _ratio,
 				created
 			});
-
+			let mut sell_order_list = <SellOrderNativeList>::get(pair);
+			sell_order_list.insert(sell_order_list.len(), index);			
+			<SellOrderNativeList>::insert(pair, sell_order_list);			
 			<SellOrderNativeCount>::insert(pair, index + 1);	
 			//Self::deposit_event(RawEvent::SellOrderNativeCreated(index, pair, _ratio, _volume));
 		}			
 		
-		#[weight = 10_000]
-		fn token_create(origin, 
-			owner:AccountIdOf<T>, 
-			name:Vec<u8>, 
-			symbol: Vec<u8>, 
-			initial_supply: BalanceOf<T>
-		) -> DispatchResult {
-			ensure_root(origin.clone())?;
-			let caller = ensure_signed(origin)?;
-
-			let index = TokenCount::get();
-			TokenCount::put(index + 1);		
-			
-			let created = <system::Module<T>>::block_number();
-
-			<Tokens<T>>::insert(index, TokenInfo {
-				name,
-				symbol,
-				owner,
-				created
-			});			
-
-			<TokenBalance<T>>::insert((index, &caller), initial_supply);
-			<TokenSupply<T>>::insert(index, initial_supply);
-			<TokenOwner<T>>::insert(index, &caller);
-
-			Self::deposit_event(RawEvent::TokenCreated(index));
-
-			Ok(())
-		}	
-		
-		#[weight = 10_000]
-		fn token_transfer(origin, 
-			token:u32, 
-			to: T::AccountId, 
-			value: BalanceOf<T> 
-		) -> DispatchResult {
-			let caller = ensure_signed(origin)?;
-
-			Self::transfer_token(token, caller, to, value);
-			Ok(())
-		}	
-					
-		#[weight = 10_000]
-		fn token_pause(origin, 
-			token: u32, 
-			status: bool 
-		) -> DispatchResult {
-			let caller = ensure_signed(origin)?;
-			let token_owner = Self::token_owner(token);
-			ensure!(caller == token_owner, <Error<T>>::NotTokenOwner);
-
-			let token_boolean = Self::token_paused(token);
-			let new_status: bool;
-			if token_boolean {
-				new_status = true;
-			} else {	
-				new_status = false;			
-			}
-			<TokenPaused>::insert(token, new_status);			
-			Self::deposit_event(RawEvent::TokenPausedOperation(token, new_status));
-			Ok(())
-		}	
-		
-		#[weight = 10_000]
-		fn token_mint(origin, 
-			token:u32, 
-			value: BalanceOf<T> 
-		) -> DispatchResult {
-			let caller = ensure_signed(origin)?;
-			let token_owner = Self::token_owner(token);
-			ensure!(caller == token_owner, <Error<T>>::NotTokenOwner);			
-
-			let minter_balance = Self::token_balance((token, &caller));
-			let token_supply = Self::token_supply(token);
-
-			<TokenBalance<T>>::insert((token, &caller), minter_balance + value);
-			<TokenSupply<T>>::insert(token, token_supply + value);
-
-			Self::deposit_event(RawEvent::TokenMint(token, caller, value));
-			Ok(())
-		}	
-		
-		#[weight = 10_000]
-		fn token_burn(origin, 
-			token:u32, 
-			value: BalanceOf<T> 
-		) -> DispatchResult {
-			let caller = ensure_signed(origin)?;
-			let token_owner = Self::token_owner(token);
-			ensure!(caller == token_owner, <Error<T>>::NotTokenOwner);		
-
-			let burner_balance = Self::token_balance((token, &caller));
-			ensure!(value < burner_balance, <Error<T>>::InsufficientAmount);			
-			let token_supply = Self::token_supply(token);
-
-			<TokenBalance<T>>::insert((token, &caller), burner_balance - value);
-			<TokenSupply<T>>::insert(token, token_supply - value);
-
-			Self::deposit_event(RawEvent::TokenBurn(token, caller, value));
-			Ok(())
-		}	
 							
 		fn on_finalize(now: T::BlockNumber) {
 			
@@ -606,23 +482,9 @@ impl<T: Trait> Module<T> {
 		to: AccountIdOf<T>, 
 		value:BalanceOf<T>) -> () {
 
-		let _lol = T::Currency::transfer(&from, &to, value, AllowDeath);//.map_err(|_| DispatchError::Other("Can't make transfer"))?;			
+		let _lol = <T as pallet_token::Trait>::Currency::transfer(&from, &to, value, AllowDeath);//.map_err(|_| DispatchError::Other("Can't make transfer"))?;			
 	}	
 
-	fn transfer_token(token: u32, 
-		from: AccountIdOf<T>, 
-		to: AccountIdOf<T>, 
-		value:BalanceOf<T>) -> () {
-
-		//let sender_balance2 = <pallet_token::TokenBalance<T>>::token_balance((token.clone(), from.clone()));//<pallet_token::TokenBalance<T>>::get((token.clone(), from.clone()));
-		let sender_balance = Self::token_balance((token, &from));
-		let receiver_balance = Self::token_balance((token, &to));
-
-		<TokenBalance<T>>::insert((token, &from), sender_balance - value);
-		<TokenBalance<T>>::insert((token, &to), receiver_balance + value);
-
-		Self::deposit_event(RawEvent::TokenTransfer(token, from, to, value));		
-	}
 
 	fn swap(pair: u128, 
 		seller: AccountIdOf<T>, 
@@ -638,16 +500,16 @@ impl<T: Trait> Module<T> {
 		let p999 = sp_runtime::Permill::from_parts(999000);
 
 		let base_after_fee = p999 * seller_volume;		
-		Self::transfer_token(base, exchange.clone(), seller.clone(), base_after_fee);
-		Self::transfer_token(base, exchange.clone(), vault.clone(), seller_volume - base_after_fee);
+		<Token::Module<T>>::transfer_(base, exchange.clone(), seller.clone(), base_after_fee);
+		<Token::Module<T>>::transfer_(base, exchange.clone(), vault.clone(), seller_volume - base_after_fee);
 		let target_after_fee = p999 * buyer_volume;
-		Self::transfer_token(target, exchange.clone(), buyer.clone(), target_after_fee);
-		Self::transfer_token(target, exchange.clone(), vault.clone(), buyer_volume - target_after_fee);
+		<Token::Module<T>>::transfer_(target, exchange.clone(), buyer.clone(), target_after_fee);
+		<Token::Module<T>>::transfer_(target, exchange.clone(), vault.clone(), buyer_volume - target_after_fee);
 
 		let created = <system::Module<T>>::block_number();	
 		let index = <TradeCount>::get(pair);	
 
-		<Trades<T>>::insert(index, TradeInfo {
+		<Trades<T>>::insert((pair, index), TradeInfo {
 			pair,
 			seller,
 			buyer,
@@ -667,16 +529,19 @@ impl<T: Trait> Module<T> {
 		
 		for pair in 0..all_pairs {
 
-			let _buy_orders = <BuyOrder<T>>::get(pair);
-			let _sell_orders = <SellOrder<T>>::get(pair);
+			let _buy_orders = <BuyOrderList>::get(pair);
+			let _sell_orders = <SellOrderList>::get(pair);
 
 			let buy_orders_iter = _buy_orders.iter();				
 
-			for buy_item in buy_orders_iter {
+			for buy_item_number in buy_orders_iter {
+				let buy_item = <BuyOrder<T>>::get((pair, buy_item_number));
 
 				let sell_orders_iter = _sell_orders.iter();
 
-				for sell_item in sell_orders_iter {
+				for sell_item_number in sell_orders_iter {
+
+					let sell_item = <SellOrder<T>>::get((pair, sell_item_number));
 
 					let buy_account = &buy_item.buyer;
 					let buy_order_id = buy_item.order_id;
@@ -710,23 +575,23 @@ impl<T: Trait> Module<T> {
 						let new_buyer_volume = buy_volume - base_volume;
 						let new_seller_volume =  sell_volume - target_volume;
 
-						BuyOrder::<T>::mutate(buy_order_id, |v| *v = Some(BuyOrderInfo {
+						BuyOrder::<T>::mutate((pair, buy_order_id), |v| *v = BuyOrderInfo {
 							order_id: buy_order_id,
 							pair: pair,
 							buyer: buy_account.clone(),
 							volume: new_buyer_volume,
 							ratio: buy_price,
 							created: *buy_created
-						}));
+						});
 						
-						SellOrder::<T>::mutate(sell_order_id, |v| *v = Some(SellOrderInfo {
+						SellOrder::<T>::mutate((pair, sell_order_id), |v| *v = SellOrderInfo {
 							order_id: sell_order_id,
 							pair: pair,
 							seller: sell_account.clone(),
 							volume: new_seller_volume,
 							ratio: sell_price,
 							created: *sell_created
-						}));									
+						});									
 
 						// SWAP
 						Self::swap(pair.clone(), 
@@ -767,29 +632,53 @@ impl<T: Trait> Module<T> {
 				}	
 
 			}
-
+		
 
 			let buy_orders_iter2 = _buy_orders.iter();	
-			for buy_item in buy_orders_iter2 {
+			for buy_item_number in buy_orders_iter2 {
+				let buy_item = <BuyOrder<T>>::get((pair, buy_item_number));
 				let buy_order_id = buy_item.order_id;
 				let buy_volume = buy_item.volume;					
 
-				if buy_volume <= min_volume {
-					BuyOrder::<T>::remove(buy_order_id);
-					BuyOrderCount::mutate(pair, |v| *v -= 1);
+				if buy_volume <= min_volume {					
+					let mut buy_order_list = <BuyOrderList>::get(pair);
+					match buy_order_list.binary_search(&buy_item_number) {
+
+						Ok(index) => {
+							buy_order_list.remove(index);
+							<BuyOrderList>::insert(pair, buy_order_list);							
+							<BuyOrder<T>>::remove((pair, buy_order_id));
+						},
+						Err(_) => {
+							
+						},
+					}
 				}		
 			}				
 
 			let sell_orders_iter2 = _sell_orders.iter();
 
-			for sell_item in sell_orders_iter2 {
+			for sell_item_number in sell_orders_iter2 {
+				let sell_item = <SellOrder<T>>::get((pair, sell_item_number));	
 				let sell_order_id = sell_item.order_id;
-				let sell_volume = sell_item.volume;					
+				let sell_volume = sell_item.volume;	
+				
+				if sell_volume <= min_volume {					
+					let mut sell_order_list = <SellOrderList>::get(pair);
+					match sell_order_list.binary_search(&sell_item_number) {
 
-				if sell_volume <= min_volume {
-					SellOrder::<T>::remove(sell_order_id);
-					SellOrderCount::mutate(pair, |v| *v -= 1);
-				}	
+						Ok(index) => {
+							sell_order_list.remove(index);
+							<SellOrderList>::insert(pair, sell_order_list);							
+							<SellOrder<T>>::remove((pair, sell_order_id));
+						},
+						Err(_) => {
+							
+						},
+					}
+				}					
+
+				//SellOrderCount::mutate(pair, |v| *v -= 1);	
 			}				
 					
 	
@@ -812,13 +701,13 @@ impl<T: Trait> Module<T> {
 		Self::transfer_coin(exchange.clone(), seller.clone(), base_after_fee);
 		Self::transfer_coin(exchange.clone(), vault.clone(), seller_volume - base_after_fee);
 		let target_after_fee = p999 * buyer_volume;
-		Self::transfer_token(target, exchange.clone(), buyer.clone(), target_after_fee);
-		Self::transfer_token(target, exchange.clone(), vault.clone(), buyer_volume - target_after_fee);
+		<Token::Module<T>>::transfer_(target, exchange.clone(), buyer.clone(), target_after_fee);
+		<Token::Module<T>>::transfer_(target, exchange.clone(), vault.clone(), buyer_volume - target_after_fee);
 
 		let created = <system::Module<T>>::block_number();	
 		let index = <TradeNativeCount>::get(pair);	
 
-		<TradeNatives<T>>::insert(index, TradeNativeInfo {
+		<TradeNatives<T>>::insert((pair, index), TradeNativeInfo {
 			pair,
 			seller,
 			buyer,
@@ -838,16 +727,18 @@ impl<T: Trait> Module<T> {
 		
 		for pair in 0..all_pairs {
 
-			let _buy_orders = <BuyOrderNative<T>>::get(pair);
-			let _sell_orders = <SellOrderNative<T>>::get(pair);
+			let _buy_orders = <BuyOrderNativeList>::get(pair);
+			let _sell_orders = <SellOrderNativeList>::get(pair);
 
 			let buy_orders_iter = _buy_orders.iter();				
 
-			for buy_item in buy_orders_iter {
+			for buy_item_number in buy_orders_iter {
+				let buy_item = <BuyOrderNative<T>>::get((pair, buy_item_number));
 
 				let sell_orders_iter = _sell_orders.iter();
 
-				for sell_item in sell_orders_iter {
+				for sell_item_number in sell_orders_iter {
+					let sell_item = <SellOrderNative<T>>::get((pair, sell_item_number));
 
 					let buy_account = &buy_item.buyer;
 					let buy_order_id = buy_item.order_id;
@@ -881,23 +772,23 @@ impl<T: Trait> Module<T> {
 						let new_buyer_volume = buy_volume - base_volume;
 						let new_seller_volume =  sell_volume - target_volume;
 
-						BuyOrderNative::<T>::mutate(buy_order_id, |v| *v = Some(BuyOrderNativeInfo {
+						BuyOrderNative::<T>::mutate((pair, buy_order_id), |v| *v = BuyOrderNativeInfo {
 							order_id: buy_order_id,
 							pair: pair,
 							buyer: buy_account.clone(),
 							volume: new_buyer_volume,
 							ratio: buy_price,
 							created: *buy_created
-						}));
+						});
 						
-						SellOrderNative::<T>::mutate(sell_order_id, |v| *v = Some(SellOrderNativeInfo {
+						SellOrderNative::<T>::mutate((pair, sell_order_id), |v| *v = SellOrderNativeInfo {
 							order_id: sell_order_id,
 							pair: pair,
 							seller: sell_account.clone(),
 							volume: new_seller_volume,
 							ratio: sell_price,
 							created: *sell_created
-						}));									
+						});									
 
 						// SWAP
 						Self::swap_native(pair.clone(), 
@@ -919,25 +810,47 @@ impl<T: Trait> Module<T> {
 
 
 			let buy_orders_iter2 = _buy_orders.iter();	
-			for buy_item in buy_orders_iter2 {
+			for buy_item_number in buy_orders_iter2 {
+				let buy_item = <BuyOrderNative<T>>::get((pair, buy_item_number));
 				let buy_order_id = buy_item.order_id;
 				let buy_volume = buy_item.volume;					
 
-				if buy_volume <= min_volume {
-					BuyOrderNative::<T>::remove(buy_order_id);
-					BuyOrderNativeCount::mutate(pair, |v| *v -= 1);
-				}		
+				if buy_volume <= min_volume {					
+					let mut buy_order_list = <BuyOrderNativeList>::get(pair);
+					match buy_order_list.binary_search(&buy_item_number) {
+
+						Ok(index) => {
+							buy_order_list.remove(index);
+							<BuyOrderNativeList>::insert(pair, buy_order_list);							
+							<BuyOrderNative<T>>::remove((pair, buy_order_id));
+						},
+						Err(_) => {
+							
+						},
+					}
+				}	
 			}				
 
 			let sell_orders_iter2 = _sell_orders.iter();
 
-			for sell_item in sell_orders_iter2 {
+			for sell_item_number in sell_orders_iter2 {
+				let sell_item = <SellOrderNative<T>>::get((pair, sell_item_number));
 				let sell_order_id = sell_item.order_id;
 				let sell_volume = sell_item.volume;					
 
-				if sell_volume <= min_volume {
-					SellOrderNative::<T>::remove(sell_order_id);
-					SellOrderNativeCount::mutate(pair, |v| *v -= 1);
+				if sell_volume <= min_volume {					
+					let mut sell_order_list = <SellOrderNativeList>::get(pair);
+					match sell_order_list.binary_search(&sell_item_number) {
+
+						Ok(index) => {
+							sell_order_list.remove(index);
+							<SellOrderNativeList>::insert(pair, sell_order_list);							
+							<SellOrderNative<T>>::remove((pair, sell_order_id));
+						},
+						Err(_) => {
+							
+						},
+					}
 				}	
 			}				
 					
