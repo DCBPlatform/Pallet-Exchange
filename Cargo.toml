@@ -21,10 +21,9 @@ sp-runtime = { version = '2.0.0', default-features = false }
 sp-std = { version = '2.0.0', default-features = false }
 sp-storage = { version = '2.0.0', default-features = false }
 
-[dependencies.pallet-token]
-default_features = false
-git = 'https://github.com/DCBPlatform/pallet-token'
-branch = 'main'
+pallet-token = { path = '../../pallets/token', default-features = false, version = '2.0.0' }
+
+
 
 [dev-dependencies]
 sp-core = { version = '2.0.0', default-features = false }

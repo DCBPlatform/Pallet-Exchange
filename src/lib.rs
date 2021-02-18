@@ -6,7 +6,7 @@ use frame_support::{
 	decl_module, 
 	decl_storage, 
 	ensure, 
-	dispatch::DispatchResult,
+	//dispatch::DispatchResult,
 	traits::{
 		Currency, 
 		//Get,
@@ -17,7 +17,7 @@ use frame_support::{
 use frame_system::{
 	self as system, 
 	ensure_signed,
-	//ensure_root
+	ensure_root
 };
 use parity_scale_codec::{
 	Decode, 
@@ -158,33 +158,51 @@ decl_storage! {
 		pub AccountVault get(fn account_vault): AccountIdOf<T>;
 		pub MinimumVolume get(fn minimum_volume): BalanceOf<T>;
 
-		pub Pair get(fn pair): map hasher(blake2_128_concat) PairIndex => Option<PairInfoOf<T>>;
+		pub Pair get(fn pair): 
+			map hasher(blake2_128_concat) PairIndex => Option<PairInfoOf<T>>;
 		pub PairCount get(fn pair_count): PairIndex;	
 
-		pub PairNative get(fn pair_native): map hasher(blake2_128_concat) PairIndex => Option<PairNativeInfoOf<T>>;
+		pub PairNative get(fn pair_native): 
+			map hasher(blake2_128_concat) PairIndex => Option<PairNativeInfoOf<T>>;
 		pub PairNativeCount get(fn pair_native_count): PairIndex;			
 
-		pub BuyOrder get(fn buy_order): map  hasher(blake2_128_concat) (PairIndex, BuyOrderIndex) => BuyOrderInfoOf<T>;
-		pub BuyOrderList get(fn buy_order_list): map  hasher(blake2_128_concat) PairIndex => Vec<BuyOrderIndex>;
-		pub BuyOrderCount get(fn buy_order_count): map hasher(blake2_128_concat) PairIndex => BuyOrderIndex;
+		pub BuyOrder get(fn buy_order): 
+			map hasher(blake2_128_concat) (PairIndex, BuyOrderIndex) => BuyOrderInfoOf<T>;
+		pub BuyOrderList get(fn buy_order_list): 
+			map hasher(blake2_128_concat) PairIndex => Vec<BuyOrderIndex>;
+		pub BuyOrderCount get(fn buy_order_count): 
+			map hasher(blake2_128_concat) PairIndex => BuyOrderIndex;
 
-		pub BuyOrderNative get(fn buy_order_native): map  hasher(blake2_128_concat) (PairNativeIndex, BuyOrderNativeIndex) => BuyOrderNativeInfoOf<T>;
-		pub BuyOrderNativeList get(fn buy_order_native_list): map  hasher(blake2_128_concat) PairNativeIndex => Vec<BuyOrderNativeIndex>;
-		pub BuyOrderNativeCount get(fn buy_order_native_count): map hasher(blake2_128_concat) PairNativeIndex => BuyOrderNativeIndex;
+		pub BuyOrderNative get(fn buy_order_native): 
+			map hasher(blake2_128_concat) (PairNativeIndex, BuyOrderNativeIndex) => BuyOrderNativeInfoOf<T>;
+		pub BuyOrderNativeList get(fn buy_order_native_list): 
+			map hasher(blake2_128_concat) PairNativeIndex => Vec<BuyOrderNativeIndex>;
+		pub BuyOrderNativeCount get(fn buy_order_native_count): 
+			map hasher(blake2_128_concat) PairNativeIndex => BuyOrderNativeIndex;
 
-		pub SellOrder get(fn sell_order): map  hasher(blake2_128_concat) (PairIndex, SellOrderIndex) => SellOrderInfoOf<T>;
-		pub SellOrderList get(fn sell_order_list): map  hasher(blake2_128_concat) PairIndex => Vec<SellOrderIndex>;
-		pub SellOrderCount get(fn sell_order_count): map hasher(blake2_128_concat) PairIndex => SellOrderIndex;
+		pub SellOrder get(fn sell_order): 
+			map hasher(blake2_128_concat) (PairIndex, SellOrderIndex) => SellOrderInfoOf<T>;
+		pub SellOrderList get(fn sell_order_list): 
+			map hasher(blake2_128_concat) PairIndex => Vec<SellOrderIndex>;
+		pub SellOrderCount get(fn sell_order_count): 
+			map hasher(blake2_128_concat) PairIndex => SellOrderIndex;
 
-		pub SellOrderNative get(fn sell_order_native): map  hasher(blake2_128_concat) (PairNativeIndex, SellOrderNativeIndex) => SellOrderNativeInfoOf<T>;
-		pub SellOrderNativeList get(fn sell_order_native_list): map  hasher(blake2_128_concat) PairNativeIndex => Vec<SellOrderNativeIndex>;
-		pub SellOrderNativeCount get(fn sell_order_native_count): map hasher(blake2_128_concat) PairNativeIndex => SellOrderNativeIndex;
+		pub SellOrderNative get(fn sell_order_native): 
+			map hasher(blake2_128_concat) (PairNativeIndex, SellOrderNativeIndex) => SellOrderNativeInfoOf<T>;
+		pub SellOrderNativeList get(fn sell_order_native_list): 
+			map hasher(blake2_128_concat) PairNativeIndex => Vec<SellOrderNativeIndex>;
+		pub SellOrderNativeCount get(fn sell_order_native_count): 
+			map hasher(blake2_128_concat) PairNativeIndex => SellOrderNativeIndex;
 
-		pub Trades get(fn trades): map hasher(blake2_128_concat) (PairIndex, TradeIndex) => Option<TradeInfoOf<T>>;
-		pub TradeCount get(fn trade_count): map hasher(blake2_128_concat) PairIndex => TradeIndex;
+		pub Trades get(fn trades): 
+			map hasher(blake2_128_concat) (PairIndex, TradeIndex) => Option<TradeInfoOf<T>>;
+		pub TradeCount get(fn trade_count): 
+			map hasher(blake2_128_concat) PairIndex => TradeIndex;
 		
-		pub TradeNatives get(fn trade_natives): map hasher(blake2_128_concat) (PairNativeIndex, TradeNativeIndex) => Option<TradeNativeInfoOf<T>>;
-		pub TradeNativeCount get(fn trade_native_count): map hasher(blake2_128_concat) PairNativeIndex => TradeNativeIndex;		
+		pub TradeNatives get(fn trade_natives): 
+			map hasher(blake2_128_concat) (PairNativeIndex, TradeNativeIndex) => Option<TradeNativeInfoOf<T>>;
+		pub TradeNativeCount get(fn trade_native_count): 
+			map hasher(blake2_128_concat) PairNativeIndex => TradeNativeIndex;		
 	}
 }
 
@@ -237,7 +255,7 @@ decl_module! {
 		
 		#[weight = 10_000]
 		fn exchange_accounts(origin, account_type:u32, account_id:AccountIdOf<T>) {
-			let _creator = ensure_signed(origin)?;
+			let _creator = ensure_root(origin)?;
 			if account_type == 1 {
 				<AccountOperation<T>>::put(account_id)
 			} else if account_type == 2 {
@@ -247,7 +265,7 @@ decl_module! {
 
 		#[weight = 10_000]
 		fn exchange_fees(origin, fee_type:u32, fee:BalanceOf<T>) {
-			let _creator = ensure_signed(origin)?;
+			let _creator = ensure_root(origin)?;
 			if fee_type == 1 {
 				<MinimumVolume<T>>::put(fee)
 			} else if fee_type == 2 {
@@ -261,24 +279,22 @@ decl_module! {
 			origin,
 			base: u32,
 			target: u32
-			) {
-			
-			let banker = ensure_signed(origin)?;
+			) {		
+			let banker = ensure_signed(origin.clone())?;
+			ensure_root(origin)?;
 			let created = <system::Module<T>>::block_number();
 			let active: bool = true;
 
 			let index = PairCount::get();
 			PairCount::put(index + 1);
 
-			let thing: PairInfoOf<T> = PairInfo {
-				base :base,
-				target :target,
-				banker,			
-				active :active,
-				created :created
-			};
-
-			<Pair<T>>::insert(index, thing);
+			<Pair<T>>::insert(index, PairInfo {
+				base,
+				target,
+				banker,
+				active,
+				created
+			});
 
 			Self::deposit_event(RawEvent::PairCreated(index, created));
 		}	
@@ -288,8 +304,8 @@ decl_module! {
 			origin,
 			target: u32
 			) {
-			
-			let banker = ensure_signed(origin)?;
+			let banker = ensure_signed(origin.clone())?;
+			ensure_root(origin)?;
 			let created = <system::Module<T>>::block_number();
 			let active: bool = true;
 
@@ -321,7 +337,7 @@ decl_module! {
 
 			let exchange = Self::account_operation();
 
-			let base_balance = <Token::Module<T>>::balance((base, &caller));				
+			let base_balance = <Token::Module<T>>::get_balance(base, caller.clone());				
 			ensure!(base_balance >= volume, Error::<T>::InsufficientAmount);
 
 			let _volume = volume;
@@ -399,7 +415,7 @@ decl_module! {
 			let volume = volume;
 			let ratio = ratio;					
 			let exchange = Self::account_operation();
-			let target_balance = <Token::Module<T>>::balance((target, &caller));			
+			let target_balance = <Token::Module<T>>::get_balance(target, caller.clone());			
 
 			ensure!(target_balance >= volume, Error::<T>::InsufficientAmount);
 
@@ -438,7 +454,7 @@ decl_module! {
 			let volume = volume;
 			let ratio = ratio;					
 			let exchange = Self::account_operation();
-			let target_balance = <Token::Module<T>>::balance((target, &caller));			
+			let target_balance = <Token::Module<T>>::get_balance(target, caller.clone());			
 
 			ensure!(target_balance >= volume, Error::<T>::InsufficientAmount);
 
